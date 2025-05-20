@@ -9,8 +9,9 @@
     body {
       font-family: 'Courier New', monospace;
       background: linear-gradient(to bottom, #111, #222);
-      color: #fff;
+      color: #00ffe1;
       overflow: hidden;
+      user-select: none;
     }
     canvas {
       display: block;
@@ -18,6 +19,45 @@
       background: #111;
       border: 3px solid #00ffe1;
       border-radius: 10px;
+      margin-top: 20px;
+    }
+    #menu {
+      width: 600px;
+      margin: 80px auto;
+      padding: 20px;
+      border: 3px solid #00ffe1;
+      border-radius: 15px;
+      background: #000a;
+      text-align: center;
+      color: #00ffe1;
+    }
+    #menu h1 {
+      font-size: 2.5em;
+      margin-bottom: 20px;
+    }
+    #menu p {
+      font-size: 1.1em;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+    #startBtn {
+      margin-top: 20px;
+      padding: 12px 30px;
+      font-size: 1.2em;
+      font-family: 'Courier New', monospace;
+      background-color: #00ffe1;
+      border: none;
+      border-radius: 8px;
+      color: #000;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    #startBtn:hover {
+      background-color: #00bfa5;
+    }
+    #gameContainer {
+      display: none;
+      position: relative;
     }
     .menu-button {
       position: absolute;
@@ -31,29 +71,65 @@
       font-size: 14px;
       cursor: pointer;
       transition: background-color 0.3s;
+      z-index: 10;
     }
     .menu-button:hover {
       background-color: #00bfa5;
     }
+    #restartBtn {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      padding: 15px 35px;
+      font-size: 1.3em;
+      font-family: 'Courier New', monospace;
+      background-color: #ff0055;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      cursor: pointer;
+      display: none;
+      z-index: 20;
+      box-shadow: 0 0 15px #ff0055aa;
+    }
+    #restartBtn:hover {
+      background-color: #cc0044;
+    }
   </style>
 </head>
 <body>
-  <button class="menu-button" onclick="goToMenu()">🏠 Menu</button>
+  <div id="menu">
+    <h1>Krashcore Runner</h1>
+    <p><strong>Règles :</strong></p>
+    <p>🕹️ Utilisez la touche <strong>Espace</strong> pour sauter.<br>
+       Vous pouvez faire un <strong>double saut</strong> pour éviter les obstacles.<br>
+       Plus vous esquivez d'obstacles, plus la vitesse du jeu augmente !<br>
+       Vous gagnez un <strong>bonus de points</strong> pour chaque obstacle esquivé parfaitement.<br>
+       Le but est de tenir le plus longtemps possible et battre votre record.</p>
+    <button id="startBtn">▶️ Continuer</button>
+  </div>
+
+  <div id="gameContainer">
+    <button class="menu-button" onclick="goToMenu()">🏠 Menu</button>
+    <canvas id="gameCanvas" width="800" height="200"></canvas>
+    <button id="restartBtn">🔁 Recommencer</button>
+  </div>
 
   <audio id="jumpSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_8c6f06bd95.mp3?filename=jump-144024.mp3"></audio>
   <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2021/09/07/audio_caa3b5c3d7.mp3?filename=retro-impact-14095.mp3"></audio>
-  <audio id="bgMusic" src="https://cdn.pixabay.com/download/audio/2023/03/28/audio_5a42fd7fc1.mp3?filename=chiptune-cyberpunk-139499.mp3" loop autoplay></audio>
+  <audio id="bgMusic" src="https://cdn.pixabay.com/download/audio/2023/03/28/audio_5a42fd7fc1.mp3?filename=chiptune-cyberpunk-139499.mp3" loop></audio>
 
-  <canvas id="gameCanvas" width="800" height="200"></canvas>
   <script>
-    function goToMenu() {
-      window.location.href = '/';
-    }
-
+    const menu = document.getElementById('menu');
+    const gameContainer = document.getElementById('gameContainer');
+    const startBtn = document.getElementById('startBtn');
+    const restartBtn = document.getElementById('restartBtn');
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
     let gameSpeed = 4;
+    const maxGameSpeed = 12;
     let gravity = 1;
     let isGameOver = false;
     let score = 0;
@@ -62,7 +138,6 @@
     const hitSound = document.getElementById('hitSound');
     const bgMusic = document.getElementById('bgMusic');
     bgMusic.volume = 0.3;
-    bgMusic.play().catch(() => {});
 
     class Player {
       constructor() {
@@ -110,6 +185,17 @@
         ctx.beginPath();
         ctx.arc(0, 0, this.width / 2, 0, Math.PI * 2);
         ctx.stroke();
+
+        // Trace stylée quand au sol
+        if (this.grounded) {
+          ctx.strokeStyle = '#00ffe1aa';
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(-this.width / 2 - 8, this.height / 2);
+          ctx.lineTo(this.width / 2 + 8, this.height / 2);
+          ctx.stroke();
+        }
+
         ctx.restore();
       }
     }
@@ -122,6 +208,7 @@
         this.x = canvas.width;
         this.y = canvas.height - this.height;
         this.color = ['#ff0055', '#ffcc00', '#00ff99'][type % 3];
+        this.passed = false; // Pour bonus score
       }
 
       update() {
@@ -139,6 +226,25 @@
     const obstacles = [];
     let spawnTimer = 0;
 
+    function goToMenu() {
+      location.reload();
+    }
+
+    function resetGame() {
+      obstacles.length = 0;
+      score = 0;
+      gameSpeed = 4;
+      isGameOver = false;
+      player.y = canvas.height - player.height;
+      player.dy = 0;
+      player.jumpCount = 0;
+      spawnTimer = 0;
+      restartBtn.style.display = 'none';
+      bgMusic.currentTime = 0;
+      bgMusic.play().catch(() => {});
+      updateGame();
+    }
+
     function updateGame() {
       if (isGameOver) return;
 
@@ -149,50 +255,89 @@
 
       spawnTimer++;
       if (spawnTimer > 60) {
-        obstacles.push(new Obstacle(Math.floor(Math.random() * 3)));
+        // Plusieurs obstacles aléatoires à la fois (0 à 2)
+        let nbObstacles = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < nbObstacles; i++) {
+          obstacles.push(new Obstacle(Math.floor(Math.random() * 3)));
+        }
         spawnTimer = 0;
       }
 
       for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].update();
 
+        // Si obstacle sort de l'écran à gauche
         if (obstacles[i].x + obstacles[i].width < 0) {
           obstacles.splice(i, 1);
           score++;
-        }
+        } else {
+          // Bonus score si esquive parfaite (quand joueur dépasse obstacle sans collision et obstacle pas encore passé)
+          if (!obstacles[i].passed && (player.x > obstacles[i].x + obstacles[i].width)) {
+            score += 5; // bonus 5 points
+            obstacles[i].passed = true;
+          }
 
-        if (
-          player.x < obstacles[i].x + obstacles[i].width &&
-          player.x + player.width > obstacles[i].x &&
-          player.y < obstacles[i].y + obstacles[i].height &&
-          player.y + player.height > obstacles[i].y
-        ) {
-          isGameOver = true;
-          hitSound.currentTime = 0;
-          hitSound.play();
-          ctx.fillStyle = 'red';
-          ctx.font = '24px monospace';
-          ctx.fillText('Game Over ! Score : ' + score + ' | Appuie sur Espace pour recommencer', 100, 100);
-          return;
+          // Collision détection
+          if (
+            player.x < obstacles[i].x + obstacles[i].width &&
+            player.x + player.width > obstacles[i].x &&
+            player.y < obstacles[i].y + obstacles[i].height &&
+            player.y + player.height > obstacles[i].y
+          ) {
+            isGameOver = true;
+            hitSound.currentTime = 0;
+            hitSound.play();
+            restartBtn.style.display = 'block';
+            bgMusic.pause();
+
+            ctx.fillStyle = '#ff0055';
+            ctx.font = '24px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('Game Over ! Score : ' + score, canvas.width / 2, 100);
+            ctx.fillText('Appuie sur 🔁 Recommencer', canvas.width / 2, 140);
+
+            return;
+          }
         }
       }
 
+      // Accélération progressive jusqu'à maxGameSpeed
+      if (gameSpeed < maxGameSpeed) {
+        gameSpeed += 0.0015; 
+      }
+
+      // Affichage score
       ctx.fillStyle = '#00ffe1';
       ctx.font = '20px monospace';
+      ctx.textAlign = 'left';
       ctx.fillText('Score : ' + score, 10, 30);
     }
+
+    startBtn.addEventListener('click', () => {
+      menu.style.display = 'none';
+      gameContainer.style.display = 'block';
+      bgMusic.play().catch(() => {});
+      updateGame();
+    });
+
+    restartBtn.addEventListener('click', () => {
+      resetGame();
+    });
 
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space') {
         if (isGameOver) {
-          location.reload();
-        } else {
+          resetGame();
+        } else if (gameContainer.style.display === 'block') {
           player.jump();
         }
       }
     });
 
-    updateGame();
+    // Juste pour que la musique ne bloque pas au début (en cas de blocage auto-play)
+    document.body.addEventListener('click', () => {
+      bgMusic.play().catch(() => {});
+    });
   </script>
 </body>
 </html>
