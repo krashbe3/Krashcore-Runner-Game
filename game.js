@@ -46,13 +46,6 @@ function jump(event) {
 }
 
 function updateGame() {
-    score++;
-    scoreDisplay.textContent = `Score: ${score}`;
-
-    if (score % 100 === 0) {
-        gameSpeed += 0.5;
-    }
-
     if (Math.random() < 0.02) {
         createObstacle();
     }
@@ -70,6 +63,9 @@ function updateGame() {
             parseInt(window.getComputedStyle(player).getPropertyValue('bottom')) < 50
         ) {
             endGame();
+        } else if (obstacleLeft < 50) {
+            score++;
+            scoreDisplay.textContent = `Score: ${score}`;
         }
     });
 }
