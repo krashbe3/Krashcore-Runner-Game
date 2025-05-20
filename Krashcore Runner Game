@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Krashcore Runner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: linear-gradient(to bottom, #111, #222);
+      color: #fff;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      background: #111;
+      border: 3px solid #00ffe1;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+  <audio id="jumpSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_8c6f06bd95.mp3?filename=jump-144024.mp3"></audio>
+  <audio id="hitSound" src="https://cdn.pixabay.com/download/audio/2021/09/07/audio_caa3b5c3d7.mp3?filename=retro-impact-14095.mp3"></audio>
+  <audio id="bgMusic" src="https://cdn.pixabay.com/download/audio/2023/03/28/audio_5a42fd7fc1.mp3?filename=chiptune-cyberpunk-139499.mp3" loop autoplay></audio>
+
+  <canvas id="gameCanvas" width="800" height="200"></canvas>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let gameSpeed = 4;
+    let gravity = 1;
+    let isGameOver = false;
+    let score = 0;
+
+    const jumpSound = document.getElementById('jumpSound');
+    const hitSound = document.getElementById('hitSound');
+    const bgMusic = document.getElementById('bgMusic');
+    bgMusic.volume = 0.3;
+
+    class Player {
+      constructor() {
+        this.width = 40;
+        this.height = 40;
+        this.x = 50;
+        this.y = canvas.height - this.height;
+        this.dy = 0;
+        this.jumpForce = 15;
+        this.grounded = true;
+        this.angle = 0;
+      }
+
+      jump() {
+        if (this.grounded) {
+          this.dy = -this.jumpForce;
+          this.grounded = false;
+          jumpSound.currentTime = 0;
+          jumpSound.play();
+        }
+      }
+
+      update() {
+        this.dy += gravity;
+        this.y += this.dy;
+        this.angle += 0.1;
+
+        if (this.y + this.height >= canvas.height) {
+          this.y = canvas.height - this.height;
+          this.dy = 0;
+          this.grounded = true;
+        }
+
+        this.draw();
+      }
+
+      draw() {
+        ctx.save();
+        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        ctx.rotate(this.grounded ? 0 : this.angle);
+        ctx.fillStyle = '#00ffe1';
+        ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
+        ctx.restore();
+      }
+    }
+
+    class Obstacle {
+      constructor() {
+        this.width = 20 + Math.random() * 20;
+        this.height = 20 + Math.random() * 40;
+        this.x = canvas.width;
+        this.y = canvas.height - this.height;
+      }
+
+      update() {
+        this.x -= gameSpeed;
+        this.draw();
+      }
+
+      draw() {
+        ctx.fillStyle = '#ff0055';
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+      }
+    }
+
+    const player = new Player();
+    const obstacles = [];
+    let spawnTimer = 0;
+
+    function updateGame() {
+      if (isGameOver) return;
+
+      requestAnimationFrame(updateGame);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      player.update();
+
+      spawnTimer++;
+      if (spawnTimer > 90) {
+        obstacles.push(new Obstacle());
+        spawnTimer = 0;
+      }
+
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        obstacles[i].update();
+
+        if (obstacles[i].x + obstacles[i].width < 0) {
+          obstacles.splice(i, 1);
+          score++;
+        }
+
+        if (
+          player.x < obstacles[i].x + obstacles[i].width &&
+          player.x + player.width > obstacles[i].x &&
+          player.y < obstacles[i].y + obstacles[i].height &&
+          player.y + player.height > obstacles[i].y
+        ) {
+          isGameOver = true;
+          hitSound.play();
+          ctx.fillStyle = 'red';
+          ctx.font = '24px monospace';
+          ctx.fillText('Game Over ! Score : ' + score, 300, 100);
+          return;
+        }
+      }
+
+      ctx.fillStyle = '#00ffe1';
+      ctx.font = '20px monospace';
+      ctx.fillText('Score : ' + score, 10, 30);
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') player.jump();
+    });
+
+    updateGame();
+  </script>
+</body>
+</html>
