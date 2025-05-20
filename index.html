@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Krashcore Runner</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -78,20 +78,19 @@
     }
     #restartBtn {
       position: absolute;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      padding: 15px 35px;
-      font-size: 1.3em;
+      top: 10px;
+      left: 10px;
+      padding: 6px 15px;
+      font-size: 0.85em;
       font-family: 'Courier New', monospace;
       background-color: #ff0055;
       border: none;
-      border-radius: 10px;
+      border-radius: 6px;
       color: #fff;
       cursor: pointer;
       display: none;
       z-index: 20;
-      box-shadow: 0 0 15px #ff0055aa;
+      box-shadow: 0 0 10px #ff0055aa;
     }
     #restartBtn:hover {
       background-color: #cc0044;
@@ -103,9 +102,8 @@
     <h1>Krashcore Runner</h1>
     <p><strong>Règles :</strong></p>
     <p>🕹️ Utilisez la touche <strong>Espace</strong> pour sauter.<br>
-       Vous pouvez faire un <strong>double saut</strong> pour éviter les obstacles.<br>
-       Plus vous esquivez d'obstacles, plus la vitesse du jeu augmente !<br>
-       Vous gagnez un <strong>bonus de points</strong> pour chaque obstacle esquivé parfaitement.<br>
+       Un seul saut possible pour éviter les obstacles.<br>
+       La vitesse du jeu augmente progressivement.<br>
        Le but est de tenir le plus longtemps possible et battre votre record.</p>
     <button id="startBtn">▶️ Continuer</button>
   </div>
@@ -148,14 +146,13 @@
         this.dy = 0;
         this.jumpForce = 13;
         this.grounded = true;
-        this.jumpCount = 0;
         this.angle = 0;
       }
 
       jump() {
-        if (this.jumpCount < 2) {
+        if (this.grounded) {
           this.dy = -this.jumpForce;
-          this.jumpCount++;
+          this.grounded = false;
           jumpSound.currentTime = 0;
           jumpSound.play();
         }
@@ -170,7 +167,6 @@
           this.y = canvas.height - this.height;
           this.dy = 0;
           this.grounded = true;
-          this.jumpCount = 0;
         }
 
         this.draw();
@@ -186,7 +182,6 @@
         ctx.arc(0, 0, this.width / 2, 0, Math.PI * 2);
         ctx.stroke();
 
-        // Trace stylée quand au sol
         if (this.grounded) {
           ctx.strokeStyle = '#00ffe1aa';
           ctx.lineWidth = 4;
@@ -208,7 +203,6 @@
         this.x = canvas.width;
         this.y = canvas.height - this.height;
         this.color = ['#ff0055', '#ffcc00', '#00ff99'][type % 3];
-        this.passed = false; // Pour bonus score
       }
 
       update() {
@@ -237,7 +231,7 @@
       isGameOver = false;
       player.y = canvas.height - player.height;
       player.dy = 0;
-      player.jumpCount = 0;
+      player.grounded = true;
       spawnTimer = 0;
       restartBtn.style.display = 'none';
       bgMusic.currentTime = 0;
@@ -255,7 +249,6 @@
 
       spawnTimer++;
       if (spawnTimer > 60) {
-        // Plusieurs obstacles aléatoires à la fois (0 à 2)
         let nbObstacles = 1 + Math.floor(Math.random() * 2);
         for (let i = 0; i < nbObstacles; i++) {
           obstacles.push(new Obstacle(Math.floor(Math.random() * 3)));
@@ -266,17 +259,10 @@
       for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].update();
 
-        // Si obstacle sort de l'écran à gauche
         if (obstacles[i].x + obstacles[i].width < 0) {
           obstacles.splice(i, 1);
           score++;
         } else {
-          // Bonus score si esquive parfaite (quand joueur dépasse obstacle sans collision et obstacle pas encore passé)
-          if (!obstacles[i].passed && (player.x > obstacles[i].x + obstacles[i].width)) {
-            score += 5; // bonus 5 points
-            obstacles[i].passed = true;
-          }
-
           // Collision détection
           if (
             player.x < obstacles[i].x + obstacles[i].width &&
@@ -294,16 +280,15 @@
             ctx.font = '24px monospace';
             ctx.textAlign = 'center';
             ctx.fillText('Game Over ! Score : ' + score, canvas.width / 2, 100);
-            ctx.fillText('Appuie sur 🔁 Recommencer', canvas.width / 2, 140);
 
             return;
           }
         }
       }
 
-      // Accélération progressive jusqu'à maxGameSpeed
+      // Accélération progressive plus rapide
       if (gameSpeed < maxGameSpeed) {
-        gameSpeed += 0.0015; 
+        gameSpeed += 0.003; // Double de l'ancien 0.0015
       }
 
       // Affichage score
@@ -334,7 +319,6 @@
       }
     });
 
-    // Juste pour que la musique ne bloque pas au début (en cas de blocage auto-play)
     document.body.addEventListener('click', () => {
       bgMusic.play().catch(() => {});
     });
